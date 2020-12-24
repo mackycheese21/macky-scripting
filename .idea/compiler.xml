@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <annotationProcessing>
+      <profile name="Gradle Imported" enabled="true">
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.derive4j/derive4j/1.0.0/3397c04d4eeb68ef894902d288230b2d0b7a0636/derive4j-1.0.0.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.derive4j/derive4j-processor-api/1.0.0/49dcbfe4a20d72e4f949f7ece1912c82f024987c/derive4j-processor-api-1.0.0.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.derive4j/derive4j-annotation/1.0.0/b3032b8920588afe454933bdf8d7c91c50cb056b/derive4j-annotation-1.0.0.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.squareup/javapoet/1.11.1/210e69f58dfa76c5529a303913b4a30c2bfeb76b/javapoet-1.11.1.jar" />
+        </processorPath>
+        <module name="MESL.main" />
+      </profile>
+    </annotationProcessing>
+    <bytecodeTargetLevel target="15" />
+  </component>
+</project>
