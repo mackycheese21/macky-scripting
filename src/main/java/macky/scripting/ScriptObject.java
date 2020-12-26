@@ -13,6 +13,7 @@ public abstract class ScriptObject {
         X nil();
         X integer(int integer);
         X number(double number);
+        X bool(boolean bool);
         X string(String string);
         X table(ScriptTable table);
         X function(ScriptFunction function);
@@ -25,6 +26,7 @@ public abstract class ScriptObject {
                 .nil(() -> b == ScriptObjects.nil())
                 .integer(a -> ScriptObjects.getInteger(b).equals(Optional.of(a)) || ScriptObjects.getNumber(b).equals(Optional.of((double)a)))
                 .number(a -> ScriptObjects.getInteger(b).map(Double::valueOf).equals(Optional.of(a)) || ScriptObjects.getNumber(b).equals(Optional.of(a)))
+                .bool(a -> ScriptObjects.getBool(b).equals(Optional.of(a)))
                 .string(a -> ScriptObjects.getString(b).equals(Optional.of(a)))
                 .table(a -> ScriptObjects.getTable(b).equals(Optional.of(a)))
                 .function(a -> ScriptObjects.getFunction(b).equals(Optional.of(a)))
@@ -36,6 +38,7 @@ public abstract class ScriptObject {
                 .nil(() -> "nil")
                 .integer(String::valueOf)
                 .number(String::valueOf)
+                .bool(String::valueOf)
                 .string(String::valueOf)
                 .table(a -> "table: " + a.toString())
                 .function(a -> "function: " + a.toString())
@@ -54,6 +57,10 @@ public abstract class ScriptObject {
 
     public double number() {
         return ScriptObjects.getNumber(this).orElseThrow(() -> new ScriptException("expected double"));
+    }
+
+    public boolean bool() {
+        return ScriptObjects.getBool(this).orElseThrow(() -> new ScriptException("expected bool"));
     }
 
     public String string() {

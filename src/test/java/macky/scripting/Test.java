@@ -14,5 +14,16 @@ public class Test {
         scriptContext.evaluate(b);
         scriptContext.evaluate(c);
         scriptContext.evaluate(d);
+
+        List<Token> tokens = Token.parse("(a + b) * c");
+        System.out.println();
+        tokens.forEach(System.out::println);
+
+        AstNode node = AstNode.parseExpression(tokens);
+        System.out.println();
+        System.out.println(node.toCode());
+
+        System.out.println();
+        tokens.forEach(System.out::println);
     }
 }

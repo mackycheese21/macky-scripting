@@ -3,6 +3,7 @@ package macky.scripting;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 public class ScriptContext {
@@ -23,6 +24,10 @@ public class ScriptContext {
         } else {
             throw new ScriptException("unknown identifier " + name);
         }
+    }
+
+    public void define(String name, ScriptObject value) {
+        locals.put(name, value);
     }
 
     public boolean has(String name) {
@@ -46,6 +51,7 @@ public class ScriptContext {
                 .nil(ScriptObjects::nil)
                 .integer(ScriptObjects::integer)
                 .number(ScriptObjects::number)
+                .bool(ScriptObjects::bool)
                 .string(ScriptObjects::string)
                 .variableAccess(this::get)
                 .assign((reference, value) -> {
@@ -56,31 +62,86 @@ public class ScriptContext {
                 .call((function, arguments) -> {
                     ScriptObject functionObject = evaluate(function);
                     List<ScriptObject> args = arguments.stream().map(this::evaluate).collect(Collectors.toList());
-                    return functionObject.function().call(args);
-                }).apply(astNode);
+                    return functionObject.function().evaluateReturnValue(args);
+                })
+                .return_(returnValue -> {
+                    throw new ScriptReturnException(evaluate(returnValue));
+                })
+                .functionDeclaration((argumentNames, variadicName, body) -> ScriptObjects.function(arguments -> {
+                    ScriptContext ctx = new ScriptContext(Optional.of(this));
+                    ScriptFunction.minCount(argumentNames.size(), arguments);
+                    for (int i = 0; i < argumentNames.size(); i++) {
+                        ctx.define(argumentNames.get(i), arguments.get(i));
+                    }
+                    if (variadicName.isPresent()) {
+                        ctx.define(variadicName.get(), ScriptObjects.table(new ScriptTable(arguments.stream().skip(argumentNames.size()).collect(Collectors.toList()))));
+                    } else {
+                        ScriptFunction.maxCount(argumentNames.size(), arguments);
+                    }
+                    body.forEach(this::evaluate);
+                }))
+                .tableInitialization(tableInitializers -> {
+                    ScriptTable table = new ScriptTable();
+                    AtomicInteger i = new AtomicInteger();
+                    for (TableInitializerEntry entry : tableInitializers) {
+                        TableInitializerEntries.caseOf(entry)
+                                .map((key, value) -> {
+                                    table.put(evaluate(key), evaluate(value));
+                                    return 0;
+                                })
+                                .list(value -> {
+                                    table.put(ScriptObjects.integer(i.getAndIncrement()), evaluate(value));
+                                    return 0;
+                                });
+                    }
+                    return ScriptObjects.table(table);
+                })
+                .tableIndex((table, key) -> {
+                    ScriptObject scriptTable = evaluate(table);
+                    ScriptObject scriptKey = evaluate(key);
+                    return scriptTable.table().get(scriptKey).orElse(ScriptObjects.nil());
+                })
+                .define((name, value) -> {
+                    define(name, evaluate(value));
+                    return ScriptObjects.nil();
+                })
+                .apply(astNode);
     }
 
     public static ScriptContext createNew() {
         ScriptContext scriptContext = new ScriptContext(Optional.empty());
-        scriptContext.set("println", ScriptObjects.function(ScriptFunction.from(argument -> {
-            System.out.println(argument.printFormat());
-            return ScriptObjects.nil();
+        scriptContext.set("println", ScriptObjects.function(ScriptFunction.from(argument -> System.out.println(argument.printFormat()))));
+        scriptContext.set("add", ScriptObjects.function(ScriptFunction.from((a, b) -> {
+            throw new ScriptReturnException(ScriptObjects.caseOf(a)
+                    .integer(a1 -> ScriptObjects.caseOf(b)
+                            .integer(b1 -> ScriptObjects.integer(a1 + b1))
+                            .number(b1 -> ScriptObjects.number(a1 + b1))
+                            .otherwise(() -> {
+                                throw new ScriptException("expected numeric");
+                            })
+                    )
+                    .number(a1 -> ScriptObjects.caseOf(b)
+                            .integer(b1 -> ScriptObjects.number(a1 + b1))
+                            .number(b1 -> ScriptObjects.number(a1 + b1))
+                            .otherwise(() -> {
+                                throw new ScriptException("expected numeric");
+                            })
+                    )
+                    .otherwise(() -> {
+                        throw new ScriptException("expected numeric");
+                    }));
         })));
-        scriptContext.set("add", ScriptObjects.function(ScriptFunction.from((a, b) -> ScriptObjects.caseOf(a)
-                .integer(a1 -> ScriptObjects.caseOf(b)
-                        .integer(b1 -> ScriptObjects.integer(a1 + b1))
-                        .number(b1 -> ScriptObjects.number(a1 + b1))
-                        .otherwiseEmpty()
-                        .orElseThrow(() -> new ScriptException("expected numeric"))
-                )
-                .number(a1 -> ScriptObjects.caseOf(b)
-                        .integer(b1 -> ScriptObjects.number(a1 + b1))
-                        .number(b1 -> ScriptObjects.number(a1 + b1))
-                        .otherwiseEmpty()
-                        .orElseThrow(() -> new ScriptException("expected numeric"))
-                )
-                .otherwiseEmpty()
-                .orElseThrow(() -> new ScriptException("expected numeric")))));
+        scriptContext.set("negate", ScriptObjects.function(ScriptFunction.from(argument -> {
+            throw new ScriptReturnException(ScriptObjects.caseOf(argument)
+                    .integer(a -> ScriptObjects.integer(-a))
+                    .number(a -> ScriptObjects.number(-a))
+                    .otherwise(() -> {
+                        throw new ScriptException("expected numeric");
+                    }));
+        })));
+        scriptContext.set("not", ScriptObjects.function(ScriptFunction.from(argument -> {
+            throw new ScriptReturnException(ScriptObjects.bool(!argument.bool()));
+        })));
         return scriptContext;
     }
 
