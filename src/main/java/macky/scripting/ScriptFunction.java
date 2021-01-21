@@ -24,6 +24,12 @@ public interface ScriptFunction {
         void call(ScriptObject arg1, ScriptObject arg2);
     }
 
+    interface NumericBinary {
+        Number call(int a, int b);
+        Number call(int a, double b);
+        Number call(double a, double b);
+    }
+
     static void minCount(int count, List<ScriptObject> arguments) {
         if (arguments.size() < count) {
             throw new ScriptException("too few arguments");
@@ -49,6 +55,32 @@ public interface ScriptFunction {
             minCount(2, arguments);
             maxCount(2, arguments);
             binary.call(arguments.get(0), arguments.get(1));
+        };
+    }
+
+    static ScriptFunction from(NumericBinary numericBinary) {
+        return arguments -> {
+            minCount(2, arguments);
+            maxCount(2, arguments);
+            throw new ScriptReturnException(ScriptObjects.caseOf(arguments.get(0))
+                    .integer(a -> ScriptObjects.caseOf(arguments.get(1))
+                            .integer(b -> ScriptObject.from(numericBinary.call(a, b)))
+                            .number(b -> ScriptObject.from(numericBinary.call(a, b)))
+                            .otherwise(() -> {
+                                throw new ScriptException("expected numeric");
+                            })
+                    )
+                    .number(a -> ScriptObjects.caseOf(arguments.get(1))
+                            .integer(b -> ScriptObject.from(numericBinary.call(b, a)))
+                            .number(b -> ScriptObject.from(numericBinary.call(a, b)))
+                            .otherwise(() -> {
+                                throw new ScriptException("expected numeric");
+                            })
+                    )
+                    .otherwise(() -> {
+                        throw new ScriptException("expected numeric");
+                    })
+            );
         };
     }
 }

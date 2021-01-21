@@ -3,27 +3,21 @@ package macky.scripting;
 import java.util.List;
 
 public class Test {
+    void e(ScriptContext context, String code) {
+        System.out.println(">>> " + code);
+        List<Token> tokens = Token.parse(code);
+        while(tokens.size() > 0) {
+            AstNode astNode = AstNode.parseExpression(tokens);
+            System.out.println("[    " + astNode.toCode() + "    ]");
+            System.out.println(context.evaluate(astNode).printFormat());
+        }
+    }
     @org.junit.jupiter.api.Test
     void test() {
-        AstNode a = AstNodes.assign(AstNodes.variableAccess("i"), AstNodes.call(AstNodes.variableAccess("add"), List.of(AstNodes.integer(5), AstNodes.integer(3))));
-        AstNode b = AstNodes.call(AstNodes.variableAccess("println"), List.of(AstNodes.variableAccess("i")));
-        AstNode c = AstNodes.assign(AstNodes.variableAccess("i"), AstNodes.call(AstNodes.variableAccess("add"), List.of(AstNodes.number(10), AstNodes.variableAccess("i"))));
-        AstNode d = AstNodes.call(AstNodes.variableAccess("println"), List.of(AstNodes.variableAccess("i")));
-        ScriptContext scriptContext = ScriptContext.createNew();
-        scriptContext.evaluate(a);
-        scriptContext.evaluate(b);
-        scriptContext.evaluate(c);
-        scriptContext.evaluate(d);
-
-        List<Token> tokens = Token.parse("(a + b) * c");
-        System.out.println();
-        tokens.forEach(System.out::println);
-
-        AstNode node = AstNode.parseExpression(tokens);
-        System.out.println();
-        System.out.println(node.toCode());
-
-        System.out.println();
-        tokens.forEach(System.out::println);
+        ScriptContext c = ScriptContext.createNew();
+        e(c, "let i = 3");
+        e(c, "let j = 4");
+        e(c, "let k = 5");
+        e(c, "println(i+j*k) println(i*j+k) println(i*(j+k)) println((i+j)*k)");
     }
 }

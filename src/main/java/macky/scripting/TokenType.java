@@ -31,9 +31,7 @@ public abstract class TokenType {
 
         X rightBracket();
 
-        X additive(AdditiveOperation additiveOperation);
-
-        X multiplicative(MultiplicativeOperation multiplicativeOperation);
+        X binaryOperation(BinaryOperation binaryOperation);
 
         X semicolon();
 
@@ -60,8 +58,7 @@ public abstract class TokenType {
                 .rightBrace_("}")
                 .leftBracket_("[")
                 .rightBracket_("]")
-                .additive(additiveOperation -> AdditiveOperations.caseOf(additiveOperation).add_("+").sub_("-"))
-                .multiplicative(multiplicativeOperation -> MultiplicativeOperations.caseOf(multiplicativeOperation).mul_("*").div_("/"))
+                .binaryOperation(BinaryOperation::toString)
                 .semicolon_(";")
                 .equalsSign_("=")
                 .exclamationMark_("!")
@@ -81,8 +78,7 @@ public abstract class TokenType {
                 .rightBrace_("right brace")
                 .leftBracket_("left bracket")
                 .rightBracket_("right bracket")
-                .additive(additiveOperation -> AdditiveOperations.caseOf(additiveOperation).add_("add").sub_("sub"))
-                .multiplicative(multiplicativeOperation -> MultiplicativeOperations.caseOf(multiplicativeOperation).mul_("mul").div_("div"))
+                .binaryOperation(operation -> "binop[" + operation.tokenName() + "]")
                 .semicolon_("semicolon")
                 .equalsSign_("equals sign")
                 .exclamationMark_("exclamation mark")

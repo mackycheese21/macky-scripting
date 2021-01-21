@@ -2,20 +2,23 @@ package macky.scripting;
 
 import org.derive4j.Data;
 
-import java.util.List;
 import java.util.Optional;
-import java.util.function.Function;
-import java.util.function.Supplier;
 
 @Data
 public abstract class ScriptObject {
     public interface Cases<X> {
         X nil();
+
         X integer(int integer);
+
         X number(double number);
+
         X bool(boolean bool);
+
         X string(String string);
+
         X table(ScriptTable table);
+
         X function(ScriptFunction function);
     }
 
@@ -24,13 +27,21 @@ public abstract class ScriptObject {
     public boolean equivalent(ScriptObject b) {
         return ScriptObjects.cases()
                 .nil(() -> b == ScriptObjects.nil())
-                .integer(a -> ScriptObjects.getInteger(b).equals(Optional.of(a)) || ScriptObjects.getNumber(b).equals(Optional.of((double)a)))
+                .integer(a -> ScriptObjects.getInteger(b).equals(Optional.of(a)) || ScriptObjects.getNumber(b).equals(Optional.of((double) a)))
                 .number(a -> ScriptObjects.getInteger(b).map(Double::valueOf).equals(Optional.of(a)) || ScriptObjects.getNumber(b).equals(Optional.of(a)))
                 .bool(a -> ScriptObjects.getBool(b).equals(Optional.of(a)))
                 .string(a -> ScriptObjects.getString(b).equals(Optional.of(a)))
                 .table(a -> ScriptObjects.getTable(b).equals(Optional.of(a)))
                 .function(a -> ScriptObjects.getFunction(b).equals(Optional.of(a)))
                 .apply(this);
+    }
+
+    public static ScriptObject from(Number number) {
+        if(number instanceof Double || number instanceof Float) {
+            return ScriptObjects.number((double) number);
+        } else {
+            return ScriptObjects.integer((int) number);
+        }
     }
 
     public String printFormat() {
@@ -46,7 +57,7 @@ public abstract class ScriptObject {
     }
 
     public void nil() {
-        if(this != ScriptObjects.nil()) {
+        if (this != ScriptObjects.nil()) {
             throw new ScriptException("expected nil");
         }
     }

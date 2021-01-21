@@ -13,6 +13,13 @@ import java.util.stream.Collectors;
 @Data
 public abstract class AstNode {
 
+    @lombok.Data
+    public static class BinaryOperationCall {
+        private final AstNode left;
+        private final AstNode right;
+        private final BinaryOperation operation;
+    }
+
     public interface Cases<X> {
         X nil();
 
@@ -38,7 +45,9 @@ public abstract class AstNode {
 
         X tableIndex(AstNode table, AstNode key);
 
-        X define(String name, AstNode value);
+        X let(String name, AstNode value);
+
+        X binaryOperation(BinaryOperationCall binaryOperationCall);
     }
 
     public abstract <X> X match(Cases<X> cases);
@@ -58,7 +67,8 @@ public abstract class AstNode {
                 .functionDeclaration((argumentNames, variadicName, body) -> "function(" + String.join(", ", argumentNames) + ".." + variadicName.map(v -> "variadic(" + v + ")").orElse("none") + ": " + body.stream().map(AstNode::toString).collect(Collectors.joining(" ")) + ")")
                 .tableInitialization(tableInitializerEntries -> "table(" + tableInitializerEntries.stream().map(entry -> TableInitializerEntries.caseOf(entry).map((key, value) -> "map(" + key + " = " + value).list(value -> "list(" + value + ")")).collect(Collectors.joining(", ")) + ")")
                 .tableIndex((table, key) -> "index(" + table + "[" + key + "])")
-                .define((name, value) -> "define(" + name + " = " + value + ")");
+                .let ((name, value) -> "define(" + name + " = " + value + ")")
+                .binaryOperation(binaryOperationCall -> "binop(" + binaryOperationCall.getLeft() + ", " + binaryOperationCall.getOperation() + ", " + binaryOperationCall.getRight() + ")");
     }
 
     private String formatArgs(List<String> argumentNames, Optional<String> variadicName) {
@@ -83,7 +93,8 @@ public abstract class AstNode {
                 .functionDeclaration((argumentNames, variadicName, body) -> "function(" + formatArgs(argumentNames, variadicName) + ") { " + body.stream().map(AstNode::toCode).collect(Collectors.joining(" ")) + " }")
                 .tableInitialization(entries -> "{ " + entries.stream().map(entry -> TableInitializerEntries.caseOf(entry).map((key, value) -> key.toCode() + " = " + value.toCode()).list(AstNode::toCode)).collect(Collectors.joining(", ")) + " }")
                 .tableIndex((table, key) -> table.toCode() + "[" + key.toCode() + "]")
-                .define((name, value) -> "define " + name + " = " + value.toCode());
+                .let((name, value) -> "let " + name + " = " + value.toCode())
+                .binaryOperation(binaryOperationCall -> "(" + binaryOperationCall.getLeft() + " " + binaryOperationCall.getOperation() + " " + binaryOperationCall.getRight() + ")");
     }
 
     public void set(ScriptContext context, ScriptObject value) {
@@ -113,7 +124,8 @@ public abstract class AstNode {
     }
 
     private static boolean consumeIfPresent(List<Token> tokens, Function<TokenType, Boolean> function) {
-        if (function.apply(tokens.get(0).getTokenType())) {
+        if (tokens.size() > 0  && function.apply(tokens.get(0).getTokenType())) {
+            tokens.remove(0);
             return true;
         } else {
             return false;
@@ -154,7 +166,8 @@ public abstract class AstNode {
     }
 
     private static AstNode parseValue(List<Token> tokens) {
-        return TokenTypes.caseOf(tokens.remove(0).getTokenType())
+        TokenType first = tokens.get(0).getTokenType();
+        return TokenTypes.caseOf(first)
                 .identifier(identifier -> {
                     if (identifier.equals("nil")) {
                         return AstNodes.nil();
@@ -182,9 +195,10 @@ public abstract class AstNode {
                             }
                         }
                         return AstNodes.functionDeclaration(argNames, Optional.empty(), parseBracketedCode(tokens));
-                    } else if (identifier.equals("define")) {
+                    } else if (identifier.equals("let")) {
+                        String name = TokenTypes.getIdentifier(tokens.remove(0).getTokenType()).orElseThrow(() -> new ScriptException("expected identifier"));
                         EXPECT(tokens, TokenTypes.equalsSign()::equals);
-                        return AstNodes.define(identifier, parseExpression(tokens));
+                        return AstNodes.let(name, parseExpression(tokens));
                     } else {
                         return AstNodes.variableAccess(identifier);
                     }
@@ -212,7 +226,7 @@ public abstract class AstNode {
                     return AstNodes.tableInitialization(entries);
                 })
                 .otherwise(() -> {
-                    throw UNEXPECT(tokens.get(0).getTokenType());
+                    throw UNEXPECT(first);
                 });
     }
 
@@ -229,7 +243,7 @@ public abstract class AstNode {
                 if (!consumeIfPresent(tokens, TokenTypes.rightParen()::equals)) {
                     while (true) {
                         arguments.add(parseExpression(tokens));
-                        if (consumeIfPresent(tokens, TokenTypes.rightBracket()::equals)) {
+                        if (consumeIfPresent(tokens, TokenTypes.rightParen()::equals)) {
                             break;
                         } else {
                             EXPECT(tokens, TokenTypes.cases().comma_(true).semicolon_(true).otherwise_(false));
@@ -248,13 +262,17 @@ public abstract class AstNode {
         AstNode node = parsePrimary(tokens);
         while (tokens.size() > 0) {
             TokenType t = tokens.get(0).getTokenType();
-            Optional<MultiplicativeOperation> opt = TokenTypes.getMultiplicativeOperation(t);
+            Optional<BinaryOperation> opt = TokenTypes.getBinaryOperation(t);
             if (opt.isPresent()) {
-                tokens.remove(0);
-                node = AstNodes.call(AstNodes.variableAccess(MultiplicativeOperations.caseOf(opt.get()).mul_("mul").div_("mul")), List.of(node, parsePrimary(tokens)));
-            } else {
-                break;
+                BinaryOperation op = opt.get();
+                if(op.isMultiplicative()) {
+                    tokens.remove(0);
+                    //noinspection OptionalGetWithoutIsPresent
+                    node = AstNodes.call(AstNodes.variableAccess(BinaryOperations.caseOf(op).multiply_("multiply").divide_("divide").modulo_("modulo").otherwiseEmpty().get()), List.of(node, parsePrimary(tokens)));
+                    continue;
+                }
             }
+            break;
         }
         return node;
     }
@@ -263,13 +281,17 @@ public abstract class AstNode {
         AstNode node = parseMultiplicative(tokens);
         while (tokens.size() > 0) {
             TokenType t = tokens.get(0).getTokenType();
-            Optional<AdditiveOperation> opt = TokenTypes.getAdditiveOperation(t);
+            Optional<BinaryOperation> opt = TokenTypes.getBinaryOperation(t);
             if (opt.isPresent()) {
-                tokens.remove(0);
-                node = AstNodes.call(AstNodes.variableAccess(AdditiveOperations.caseOf(opt.get()).add_("add").sub_("sub")), List.of(node, parseMultiplicative(tokens)));
-            } else {
-                break;
+                BinaryOperation op = opt.get();
+                if(op.isAdditive()) {
+                    tokens.remove(0);
+                    //noinspection OptionalGetWithoutIsPresent
+                    node = AstNodes.call(AstNodes.variableAccess(BinaryOperations.caseOf(op).plus_("add").minus_("subtract").otherwiseEmpty().get()), List.of(node, parseMultiplicative(tokens)));
+                    continue;
+                }
             }
+            break;
         }
         return node;
     }

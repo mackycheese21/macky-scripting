@@ -84,13 +84,13 @@ public class Token {
             } else if (ch == ']') {
                 tokens.add(new Token(TokenTypes.rightBracket(), start));
             } else if (ch == '+') {
-                tokens.add(new Token(TokenTypes.additive(AdditiveOperations.add()), start));
+                tokens.add(new Token(TokenTypes.binaryOperation(BinaryOperations.plus()), start));
             } else if (ch == '-') {
-                tokens.add(new Token(TokenTypes.additive(AdditiveOperations.sub()), start));
+                tokens.add(new Token(TokenTypes.binaryOperation(BinaryOperations.minus()), start));
             } else if (ch == '*') {
-                tokens.add(new Token(TokenTypes.multiplicative(MultiplicativeOperations.mul()), start));
+                tokens.add(new Token(TokenTypes.binaryOperation(BinaryOperations.multiply()), start));
             } else if (ch == '/') {
-                tokens.add(new Token(TokenTypes.multiplicative(MultiplicativeOperations.div()), start));
+                tokens.add(new Token(TokenTypes.binaryOperation(BinaryOperations.divide()), start));
             } else if (ch == ';') {
                 tokens.add(new Token(TokenTypes.semicolon(), start));
             } else if (ch == '=') {
