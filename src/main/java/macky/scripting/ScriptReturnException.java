@@ -1,14 +1,16 @@
 package macky.scripting;
 
 public class ScriptReturnException extends ScriptException {
-    private final ScriptObject value;
 
-    public ScriptReturnException(ScriptObject value) {
-        super("return statement outside of function");
-        this.value = value;
+    private final Object returnValue;
+
+    public ScriptReturnException(Object returnValue) {
+        super("return not caught by function");
+        this.returnValue = returnValue;
     }
 
-    public ScriptObject getValue() {
-        return value;
+    public Object getReturnValue() {
+        return returnValue;
     }
+
 }

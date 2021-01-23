@@ -1,86 +1,50 @@
 package macky.scripting;
 
+import java.math.BigDecimal;
 import java.util.List;
 
-@FunctionalInterface
-public interface ScriptFunction {
+public abstract class ScriptFunction {
 
-    void call(List<ScriptObject> arguments);
+    public abstract Object call(List<Object> params);
 
-    default ScriptObject evaluateReturnValue(List<ScriptObject> arguments) {
-        try {
-            call(arguments);
-        } catch (ScriptReturnException e) {
-            return e.getValue();
-        }
-        return ScriptObjects.nil();
+    @Override
+    public String toString() {
+        return "<function>";
     }
 
-    interface Unary {
-        void call(ScriptObject argument);
+    public interface Numeric {
+        Object call(BigDecimal a, BigDecimal b);
     }
 
-    interface Binary {
-        void call(ScriptObject arg1, ScriptObject arg2);
-    }
+    public interface Binary {
+        Object call(Object a, Object b);
 
-    interface NumericBinary {
-        Number call(int a, int b);
-        Number call(int a, double b);
-        Number call(double a, double b);
-    }
-
-    static void minCount(int count, List<ScriptObject> arguments) {
-        if (arguments.size() < count) {
-            throw new ScriptException("too few arguments");
+        static Binary from(Numeric numeric) {
+            return (a, b) -> numeric.call(ScriptObjects.getNumber(a), ScriptObjects.getNumber(b));
         }
     }
 
-    static void maxCount(int count, List<ScriptObject> arguments) {
-        if (arguments.size() > count) {
-            throw new ScriptException("too many arguments");
-        }
+    static <T> void minArgCount(List<T> params, int count) {
+        if(params.size() < count) throw new ScriptException("invalid arg count");
     }
 
-    static ScriptFunction from(Unary unary) {
-        return arguments -> {
-            minCount(1, arguments);
-            maxCount(1, arguments);
-            unary.call(arguments.get(0));
-        };
+    static <T> void maxArgCount(List<T> params, int count) {
+        if(params.size() > count) throw new ScriptException("invalid arg count");
+    }
+
+    static <T> void argCount(List<T> params, int count) {
+        minArgCount(params, count);
+        maxArgCount(params, count);
     }
 
     static ScriptFunction from(Binary binary) {
-        return arguments -> {
-            minCount(2, arguments);
-            maxCount(2, arguments);
-            binary.call(arguments.get(0), arguments.get(1));
+        return new ScriptFunction() {
+            @Override
+            public Object call(List<Object> params) {
+                argCount(params, 2);
+                return binary.call(params.get(0), params.get(1));
+            }
         };
     }
 
-    static ScriptFunction from(NumericBinary numericBinary) {
-        return arguments -> {
-            minCount(2, arguments);
-            maxCount(2, arguments);
-            throw new ScriptReturnException(ScriptObjects.caseOf(arguments.get(0))
-                    .integer(a -> ScriptObjects.caseOf(arguments.get(1))
-                            .integer(b -> ScriptObject.from(numericBinary.call(a, b)))
-                            .number(b -> ScriptObject.from(numericBinary.call(a, b)))
-                            .otherwise(() -> {
-                                throw new ScriptException("expected numeric");
-                            })
-                    )
-                    .number(a -> ScriptObjects.caseOf(arguments.get(1))
-                            .integer(b -> ScriptObject.from(numericBinary.call(b, a)))
-                            .number(b -> ScriptObject.from(numericBinary.call(a, b)))
-                            .otherwise(() -> {
-                                throw new ScriptException("expected numeric");
-                            })
-                    )
-                    .otherwise(() -> {
-                        throw new ScriptException("expected numeric");
-                    })
-            );
-        };
-    }
 }
