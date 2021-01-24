@@ -60,20 +60,22 @@ public class Scope {
                 .breakStatement(() -> {
                     throw new ScriptException("break statements are not yet supported");
                 })
-                .declFunc((funcParamNames, funcBody) -> new ScriptFunction() {
-                    @Override
-                    public Object call(List<Object> params) {
-                        ScriptFunction.argCount(params, funcParamNames.size());
-                        Scope scope = push();
-                        for (int i = 0; i < funcParamNames.size(); i++) {
-                            scope.let(funcParamNames.get(i), params.get(i));
+                .declFunc((funcParamNames, funcBody) -> {
+                    return new ScriptFunction() {
+                        @Override
+                        public Object call(List<Object> params) {
+                            ScriptFunction.argCount(params, funcParamNames.size());
+                            Scope scope = push();
+                            for (int i = 0; i < funcParamNames.size(); i++) {
+                                scope.let(funcParamNames.get(i), params.get(i));
+                            }
+                            try {
+                                return scope.evaluate(funcBody);
+                            } catch (ScriptReturnException scriptReturnException) {
+                                return scriptReturnException.getReturnValue();
+                            }
                         }
-                        try {
-                            return scope.evaluate(funcBody);
-                        } catch (ScriptReturnException scriptReturnException) {
-                            return scriptReturnException.getReturnValue();
-                        }
-                    }
+                    };
                 })
                 .ifExpr((ifCondition, ifBody, ifElse) -> {
                     if (ScriptObjects.asBoolean(evaluate(ifCondition))) {
@@ -97,7 +99,9 @@ public class Scope {
                     return last;
                 })
                 .returnExpr(expr -> {
-                    if (expr.isPresent()) throw new ScriptReturnException(evaluate(expr.get()));
+                    if (expr.isPresent()) {
+                        throw new ScriptReturnException(evaluate(expr.get()));
+                    }
                     else throw new ScriptReturnException(null);
                 })
                 .loop(loopBody -> {

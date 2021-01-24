@@ -99,12 +99,12 @@ public class Tests {
         e(scope, "let fib = function(n) { if n == 1 { 1 } else { if n == 2 { 2 } else { fib(n - 1) + fib(n - 2) } } };");
         long start, end;
         start = System.currentTimeMillis();
-        e(scope, "for let i = 1; i <= 30; i += 1 { print(fib(i)) print(\" \") }");
+        e(scope, "for let i = 1; i <= 20; i += 1 { print(fib(i)) print(\" \") }");
         end = System.currentTimeMillis();
         System.out.println();
         long script = end - start;
         start = System.currentTimeMillis();
-        for (int i = 1; i <= 30; i += 1) {
+        for (int i = 1; i <= 20; i += 1) {
             System.out.print(fib(i));
             System.out.print(" ");
         }
