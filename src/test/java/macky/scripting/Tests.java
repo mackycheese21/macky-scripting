@@ -6,6 +6,9 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.junit.Test;
 
+import java.math.BigDecimal;
+import java.util.List;
+
 public class Tests {
 
     void e(Scope scope, String code) {
@@ -13,14 +16,13 @@ public class Tests {
         GrammarParser parser = new GrammarParser(new CommonTokenStream(lexer));
         GrammarParser.Expression_listContext ctx = parser.expression_list();
         Object result = null;
-        System.out.print(">>> " + code);
+        System.out.println(">>> " + code);
         try {
             for (GrammarParser.ExpressionContext exprctx : ctx.expression()) {
                 result = scope.evaluate(AntlrVisitor.INSTANCE.visit(exprctx));
             }
             System.out.println();
-        }catch (ScriptException scriptException) {
-            System.out.println();
+        } catch (ScriptException scriptException) {
             System.err.println("error: " + scriptException.getMessage());
             result = null;
         }
@@ -30,30 +32,86 @@ public class Tests {
         }
     }
 
+    int fib(int n) {
+        if (n == 1) return 1;
+        else if (n == 2) return 2;
+        else return fib(n - 1) + fib(n - 2);
+    }
+
     @Test
     public void test() {
         Scope scope = new Scope();
-        e(scope, "let x = map { \"i\" = 5; \"increment\" = function(this) { this.i += 1; }};");
-        e(scope, "x");
-        e(scope, "x.increment");
-        e(scope, "x.i");
-        e(scope, "x:increment()");
-        e(scope, "x.i");
-        e(scope, "x.increment()");
-        e(scope, "x.i");
-        e(scope, "x.increment(x)");
-        e(scope, "x.i");
-
-        e(scope, "let make_counter = function() { let i = 0; function() { i += 1; i } }");
-        e(scope, "a = make_counter()");
-        e(scope, "b = make_counter()");
-        e(scope, "a()");
-        e(scope, "b()");
-        e(scope, "a()");
-        e(scope, "b()");
-        e(scope, "a()");
-        e(scope, "b()");
-        e(scope, "a()");
-        e(scope, "b()");
+        scope.set("println", new ScriptFunction() {
+            @Override
+            public Object call(List<Object> params) {
+                argCount(params, 1);
+                System.out.println(params.get(0));
+                return null;
+            }
+        });
+        scope.set("print", new ScriptFunction() {
+            @Override
+            public Object call(List<Object> params) {
+                argCount(params, 1);
+                System.out.print(params.get(0));
+                return null;
+            }
+        });
+        scope.set("math", new ScriptingMap.Builder()
+                .put("cos", new ScriptFunction() {
+                    @Override
+                    public Object call(List<Object> params) {
+                        argCount(params, 1);
+                        return BigDecimal.valueOf(Math.cos(ScriptObjects.getNumber(params.get(0)).doubleValue()));
+                    }
+                })
+                .put("sin", new ScriptFunction() {
+                    @Override
+                    public Object call(List<Object> params) {
+                        argCount(params, 1);
+                        return BigDecimal.valueOf(Math.sin(ScriptObjects.getNumber(params.get(0)).doubleValue()));
+                    }
+                })
+                .put("tan", new ScriptFunction() {
+                    @Override
+                    public Object call(List<Object> params) {
+                        argCount(params, 1);
+                        return BigDecimal.valueOf(Math.tan(ScriptObjects.getNumber(params.get(0)).doubleValue()));
+                    }
+                })
+                .put("exp", new ScriptFunction() {
+                    @Override
+                    public Object call(List<Object> params) {
+                        argCount(params, 1);
+                        return BigDecimal.valueOf(Math.exp(ScriptObjects.getNumber(params.get(0)).doubleValue()));
+                    }
+                })
+                .put("pow", new ScriptFunction() {
+                    @Override
+                    public Object call(List<Object> params) {
+                        argCount(params, 2);
+                        return BigDecimal.valueOf(Math.pow(ScriptObjects.getNumber(params.get(0)).doubleValue(), ScriptObjects.getNumber(params.get(1)).doubleValue()));
+                    }
+                })
+                .put("e", BigDecimal.valueOf(Math.E))
+                .put("pi", BigDecimal.valueOf(Math.PI))
+                .getData());
+        e(scope, "let fib = function(n) { if n == 1 { 1 } else { if n == 2 { 2 } else { fib(n - 1) + fib(n - 2) } } };");
+        long start, end;
+        start = System.currentTimeMillis();
+        e(scope, "for let i = 1; i <= 30; i += 1 { print(fib(i)) print(\" \") }");
+        end = System.currentTimeMillis();
+        System.out.println();
+        long script = end - start;
+        start = System.currentTimeMillis();
+        for (int i = 1; i <= 30; i += 1) {
+            System.out.print(fib(i));
+            System.out.print(" ");
+        }
+        end = System.currentTimeMillis();
+        long java = end - start;
+        System.out.println();
+        System.out.println("script : " + script);
+        System.out.println("java   : " + java);
     }
 }

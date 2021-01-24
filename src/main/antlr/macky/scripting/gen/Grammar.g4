@@ -42,7 +42,6 @@ expression:
     | 'map' '{' (map_init_entry ((',' | ';') map_init_entry)*)? '}' # MapInit
     | 'list' '[' (expression ((',' | ';') expression)*)? ']' # ListInit
     | ';' # Nop
-    | <assoc=right> 'let' identifier '=' expression # DeclVar
 
     | string # StringExpr
     | number # NumberExpr
@@ -54,6 +53,7 @@ expression:
     | expression '[' expression ']' # AccessValueComplex
     | expression ':' identifier # AccessMethodSimple
     | expression ':' '[' expression ']' # AccessMethodComplex
+    | <assoc=right> 'let' identifier '=' expression # DeclVar
 
     | <assoc=right> '-' expression # UnaryNegate
     | expression multiplicative_operator expression # OpMul

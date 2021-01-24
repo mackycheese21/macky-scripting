@@ -1,17 +1,122 @@
 package macky.scripting;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class ScriptObjects {
+
+    public static final ScriptFunction STRING_LEN = new ScriptFunction() {
+        @Override
+        public Object call(List<Object> params) {
+            argCount(params, 1);
+            return new BigDecimal(getString(params.get(0)).length());
+        }
+    };
+
+    public static final ScriptFunction STRING_SUBSTR = new ScriptFunction() {
+        @Override
+        public Object call(List<Object> params) {
+            argCount(params, 3);
+            String v = getString(params.get(0));
+            int a = getNumber(params.get(1)).intValue();
+            int b = getNumber(params.get(2)).intValue();
+            try {
+                return v.substring(a, b);
+            } catch (StringIndexOutOfBoundsException e) {
+                throw new ScriptException(e.getMessage());
+            }
+        }
+    };
+
+    public static final ScriptFunction STRING_FIRST = new ScriptFunction() {
+        @Override
+        public Object call(List<Object> params) {
+            argCount(params, 2);
+            String v = getString(params.get(0));
+            int a = getNumber(params.get(1)).intValue();
+            try {
+                return v.substring(0, a);
+            } catch (StringIndexOutOfBoundsException e) {
+                throw new ScriptException(e.getMessage());
+            }
+        }
+    };
+
+    public static final ScriptFunction STRING_LAST = new ScriptFunction() {
+        @Override
+        public Object call(List<Object> params) {
+            argCount(params, 2);
+            String v = getString(params.get(0));
+            int a = getNumber(params.get(1)).intValue();
+            try {
+                return v.substring(v.length() - a);
+            } catch (StringIndexOutOfBoundsException e) {
+                throw new ScriptException(e.getMessage());
+            }
+        }
+    };
+
+    public static final ScriptFunction STRING_AT = new ScriptFunction() {
+        @Override
+        public Object call(List<Object> params) {
+            argCount(params, 2);
+            String v = getString(params.get(0));
+            int a = getNumber(params.get(1)).intValue();
+            try {
+                return "" + v.charAt(a);
+            } catch (StringIndexOutOfBoundsException e) {
+                throw new ScriptException(e.getMessage());
+            }
+        }
+    };
+
+    public static final ScriptFunction MAP_KEYS = new ScriptFunction() {
+        @Override
+        public Object call(List<Object> params) {
+            argCount(params, 1);
+            return new ArrayList<>(getMap(params.get(0)).mapKeys());
+        }
+    };
+
+    public static final ScriptFunction MAP_LEN = new ScriptFunction() {
+        @Override
+        public Object call(List<Object> params) {
+            argCount(params, 1);
+            return new BigDecimal(getMap(params.get(0)).mapSize());
+        }
+    };
+
+    public static final ScriptFunction LIST_LEN = new ScriptFunction() {
+        @Override
+        public Object call(List<Object> params) {
+            argCount(params, 1);
+            return new BigDecimal(getList(params.get(0)).listSize());
+        }
+    };
 
     private ScriptObjects() {
 
     }
 
+    public static Set<Object> getKeys(Object object) {
+        if(object instanceof Map) return ((Map<Object, Object>) object).keySet();
+        else if (object instanceof ScriptingMap) return ((ScriptingMap) object).mapKeys();
+        else throw new ScriptException("expected a map, got " + object);
+    }
+
+    public static int getLength(Object object) {
+        if(object instanceof Map) return ((Map<Object, Object>) object).size();
+        else if (object instanceof List) return ((List<Object>) object).size();
+        else if (object instanceof ScriptingMap) return ((ScriptingMap) object).mapSize();
+        else if (object instanceof ScriptingList) return ((ScriptingList) object).listSize();
+        else throw new ScriptException("expected a map or list, got " + object);
+    }
+
     public static boolean asBoolean(Object object) {
-        if(object instanceof BigDecimal) return object.equals(BigDecimal.ZERO);
+        if (object instanceof BigDecimal) return object.equals(BigDecimal.ZERO);
         else if (object instanceof String) return ((String) object).length() > 0;
         else if (object instanceof Boolean) return (boolean) object;
         else if (object == null) return false;
@@ -40,13 +145,13 @@ public class ScriptObjects {
         if (object != null) throw new ScriptException("expected null");
     }
 
-    public static Map<Object, Object> getMap(Object object) {
-        if (object instanceof Map) return (Map<Object, Object>) object;
+    public static ScriptingMap getMap(Object object) {
+        if (object instanceof Map) return ScriptingMap.wrap((Map<Object, Object>) object);
         else throw new ScriptException("expected a map, got " + object);
     }
 
-    public static List<Object> getList(Object object) {
-        if (object instanceof List) return (List<Object>) object;
+    public static ScriptingList getList(Object object) {
+        if (object instanceof List) return ScriptingList.wrap((List<Object>) object);
         else throw new ScriptException("expected a list, got " + object);
     }
 
@@ -77,51 +182,60 @@ public class ScriptObjects {
         else return ObjectType.USERDATA;
     }
 
-    public static Object simpleAccess(Object owner, Object key) {
+    public static Object access(Object owner, Object key, boolean method) {
+        Object result;
         if(owner instanceof Map) {
-            return ((Map<?, ?>) owner).get(key);
+            result = ((Map<Object, Object>) owner).get(key);
         } else if (owner instanceof List) {
             int index = getNumber(key).intValue();
-            if(index < 0 || index >= ((List<?>) owner).size()) {
-                return null;
+            if (index < 0 || index >= ((List<?>) owner).size()) {
+                throw new ScriptException("list index out of bounds");
             }
-            return ((List<?>) owner).get(index);
+            result = ((List<?>) owner).get(index);
+        } else if (owner instanceof ScriptingMap) {
+            result = ((ScriptingMap) owner).mapGet(key);
+        } else if (owner instanceof ScriptingList) {
+            int index = getNumber(key).intValue();
+            if (index < 0 || index >= ((List<?>) owner).size()) {
+                throw new ScriptException("list index out of bounds");
+            }
+            result = ((ScriptingList) owner).listGet(index);
         } else {
-            throw new ScriptException("cannot get key on " + owner);
+            throw new ScriptException("expected a map or list, got " + owner);
         }
-    }
-
-    public static Object augmentMethod(Object owner, Object property) {
-        ScriptFunction function = getFunction(property);
-        return new ScriptFunction() {
-            @Override
-            public Object call(List<Object> params) {
-                params.add(0, owner);
-                return function.call(params);
-            }
-        };
-    }
-
-    public static Object access(Object owner, Object key, boolean method) {
         if(method) {
-            return augmentMethod(owner, simpleAccess(owner, key));
+            ScriptFunction function = getFunction(result);
+            return new ScriptFunction() {
+                @Override
+                public Object call(List<Object> params) {
+                    params.add(0, owner);
+                    return function.call(params);
+                }
+            };
         } else {
-            return simpleAccess(owner, key);
+            return result;
         }
     }
 
-    public static void assign(Object owner, Object key, Object value, boolean method) {
-        if(method) value = augmentMethod(owner, value);
+    public static void assign(Object owner, Object key, Object value) {
         if(owner instanceof Map) {
             ((Map<Object, Object>) owner).put(key, value);
         } else if (owner instanceof List) {
             int index = getNumber(key).intValue();
-            if(index < 0 || index >= ((List<?>) owner).size()) {
-                throw new ScriptException("attempted to assign to out of bounds position in list");
+            if (index < 0 || index >= ((List<?>) owner).size()) {
+                throw new ScriptException("list index out of bounds");
             }
             ((List<Object>) owner).set(index, value);
+        } else if (owner instanceof ScriptingMap) {
+            ((ScriptingMap) owner).mapSet(key, value);
+        } else if (owner instanceof ScriptingList) {
+            int index = getNumber(key).intValue();
+            if (index < 0 || index >= ((ScriptingList) owner).listSize()) {
+                throw new ScriptException("list index out of bounds");
+            }
+            ((ScriptingList) owner).listSet(index, value);
         } else {
-            throw new ScriptException("cannot assign key on " + owner);
+            throw new ScriptException("expected a map or list, got " + owner);
         }
     }
 

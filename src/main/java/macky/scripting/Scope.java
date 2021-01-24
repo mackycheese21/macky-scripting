@@ -1,7 +1,5 @@
 package macky.scripting;
 
-import lombok.Data;
-
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -9,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 
 public class Scope {
+
+    public static boolean TRACE = false;
 
     private final Scope parent;
     private final Map<String, Object> vars = new HashMap<>();
@@ -55,7 +55,7 @@ public class Scope {
     }
 
     public Object evaluate(Expression expression) {
-        return Expressions.caseOf(expression)
+        Object debug = Expressions.caseOf(expression)
                 .boolLiteral(b -> (Object) b)
                 .breakStatement(() -> {
                     throw new ScriptException("break statements are not yet supported");
@@ -164,13 +164,16 @@ public class Scope {
                                     return result;
                                 })
                                 .access((keyOwner, key, method) -> {
+                                    if(method) {
+                                        throw new ScriptException("cannot assign to a method access");
+                                    }
                                     Object owner = evaluate(keyOwner);
                                     Object realKey = evaluate(key);
                                     Object result;
                                     if (basicOperator.isPresent())
-                                        result = basicOperator.get().getOp().call(this, ScriptObjects.access(owner, realKey, method), right);
+                                        result = basicOperator.get().getOp().call(this, ScriptObjects.access(owner, realKey, false), right);
                                     else result = evaluate(right);
-                                    ScriptObjects.assign(owner, realKey, result, method);
+                                    ScriptObjects.assign(owner, realKey, result);
                                     return result;
                                 })
                                 .otherwise(() -> {
@@ -179,6 +182,10 @@ public class Scope {
                         )
                 )
                 ;
+        if(TRACE) {
+            System.out.println("evaluated `" + expression.toCode() + "` => " + debug);
+        }
+        return debug;
     }
 
 }
